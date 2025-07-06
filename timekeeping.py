@@ -5,7 +5,7 @@ from typing import Dict, List
 import matplotlib.pyplot as plt
 from matplotlib import colors as mcolors
 import numpy as np
-
+import collections
 
 from pprint import pprint
 
@@ -85,6 +85,10 @@ class Activity(object):
             print(self.end_time, self.start_time, self.duration)
             self.end_time = self.start_time + self.duration
         assert self.end_time - self.start_time == self.duration, 'calculation trouble'
+
+        # Add this to store tags and optionally the row
+        self.tags = row.get('Work Type', '')
+        self.row = row  # optional, for future flexibility
 
 
 class Work(object):
@@ -355,6 +359,35 @@ class Work(object):
         return True
 
 
+    def plot_tags_pie(self, year: int):
+        """
+        Plots a pie chart of total time spent per tag for the given year.
+        """
+        tag_sums = collections.defaultdict(datetime.timedelta)
+        for act in self.activities:
+            if act.day.year == year:
+                tags = act.__dict__.get('tags') or act.__dict__.get('Tags') or act.__dict__.get('Tag')
+                # If tags are not already parsed, try to get from row
+                if not tags and hasattr(act, 'row'):
+                    tags = act.row.get('Project Code', '')
+                if not tags:
+                    continue
+                # Assume tags are comma-separated
+                for tag in [t.strip() for t in tags.split(',') if t.strip()]:
+                    tag_sums[tag] += act.duration
+
+        if not tag_sums:
+            print(f"No tag data found for year {year}.")
+            return
+
+        labels = list(tag_sums.keys())
+        times = [td.days * 24 + td.seconds / 3600 for td in tag_sums.values()]
+
+        fig, ax = plt.subplots(figsize=(8, 8))
+        ax.pie(times, labels=labels, autopct='%1.1f%%', startangle=140)
+        ax.set_title(f"Total Time Spent per Tag in {year}")
+        plt.show()
+        return True
 
 
 def compute_week_sums():
@@ -440,9 +473,10 @@ def main():
     end_date = datetime.date(day=1, month=9, year=2019)
     weekends = worktime.weekends(start_date, end_date, verbose=True)
     holidays = worktime.holidays(start_date, end_date, verbose=True)
-    worktime.plot_week_hours(start_date, end_date)
+    # worktime.plot_week_hours(start_date, end_date)
     # worktime.plot_day_hours(start_date, end_date)
-    worktime.plot_hours_per_day(start_date, end_date)
+    # worktime.plot_hours_per_day(start_date, end_date)
+    worktime.plot_tags_pie(2024)  # <-- Add this line
 
 if __name__ == "__main__":
     main()
