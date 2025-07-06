@@ -189,8 +189,6 @@ def main():
     years = sorted(years)
 
     for year in years:
-        if year not in (2024, 2025):
-            continue
         day_hours = get_day_hours_by_year(INPUT_FILE, year)
         plot_colormap_calendar(year, day_hours)
 

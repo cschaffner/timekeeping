@@ -32,10 +32,14 @@ def get_holidays_by_year(input_file, year, threshold=DAILY_THRESHOLD):
             hours = float(row.get('Duration adjusted (hours)', 0))
             day_hours[date_obj] += hours
     # Build set of all days in the year
+    today = datetime.date.today()
     all_days = [datetime.date(year, 1, 1) + datetime.timedelta(days=i) for i in range((datetime.date(year+1, 1, 1) - datetime.date(year, 1, 1)).days)]
     workday_holidays = set()
     weekend_worked = set()
     for date_obj in all_days:
+        # For the current year, skip future days
+        if year == today.year and date_obj > today:
+            continue
         hours = day_hours.get(date_obj, 0.0)
         wd = date_obj.weekday()
         if wd < 5:
@@ -119,25 +123,46 @@ def main():
                 except Exception:
                     continue
             years.add(date_obj.year)
-    years = sorted(years)
+    years = sorted([y for y in years if y >= 2019])
 
     green_counts = []
     red_counts = []
+    green_per_year = []
+    red_per_year = []
     for year in years:
         workday_holidays, weekend_worked = get_holidays_by_year(INPUT_FILE, year, DAILY_THRESHOLD)
         print(f"Year {year}: Green (workday holidays) = {len(workday_holidays)}, Red (worked weekends) = {len(weekend_worked)}")
         green_counts.append(len(workday_holidays))
         red_counts.append(len(weekend_worked))
+        green_per_year.append(workday_holidays)
+        red_per_year.append(weekend_worked)
         if year == 2024:
             plot_holiday_calendar(year, workday_holidays, weekend_worked)
 
-    # Plot bar chart of green and red days per year
+    # Plot bar chart of green and red days per year, with value labels on bars
     import numpy as np
     x = np.arange(len(years))
     width = 0.35
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.bar(x - width/2, green_counts, width, label=f'Workday holidays (<{DAILY_THRESHOLD}h)', color='lightgreen', edgecolor='black')
-    ax.bar(x + width/2, red_counts, width, label=f'Worked weekends (>={DAILY_THRESHOLD}h)', color='red', edgecolor='black')
+    bars1 = ax.bar(x - width/2, green_counts, width, label=f'Workday holidays (<{DAILY_THRESHOLD}h)', color='lightgreen', edgecolor='black')
+    bars2 = ax.bar(x + width/2, red_counts, width, label=f'Worked weekends (>={DAILY_THRESHOLD}h)', color='red', edgecolor='black')
+    # Add value labels on top of each bar
+    for bar in bars1:
+        height = bar.get_height()
+        if height > 0:
+            ax.annotate(f'{int(height)}',
+                        xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3),  # 3 points vertical offset
+                        textcoords="offset points",
+                        ha='center', va='bottom', fontsize=11, fontweight='bold', color='black')
+    for bar in bars2:
+        height = bar.get_height()
+        if height > 0:
+            ax.annotate(f'{int(height)}',
+                        xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3),
+                        textcoords="offset points",
+                        ha='center', va='bottom', fontsize=11, fontweight='bold', color='black')
     ax.set_xticks(x)
     ax.set_xticklabels([str(y) for y in years])
     ax.set_ylabel('Number of days')
